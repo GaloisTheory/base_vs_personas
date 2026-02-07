@@ -75,6 +75,9 @@ dependencies = [
   "torchvision",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["test"]
+
 [tool.uv]
 # Only resolve for Linux (since we're using CUDA wheels)
 environments = ["sys_platform == 'linux'"]

@@ -15,7 +15,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from persona_vectors import (
+from utils.persona_vectors import (
     PersonaVectorConfig,
     ActivationExtractor,
     generate_responses,
@@ -28,7 +28,7 @@ from persona_vectors import (
     PERSONAS,
     EVAL_QUESTIONS,
 )
-from plotting_utils import (
+from utils.plotting_utils import (
     plot_cosine_similarity_heatmap,
     plot_pca_projection,
     plot_pca_variance_explained,

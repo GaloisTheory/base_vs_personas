@@ -20,8 +20,8 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from persona_vectors_utils import compute_axes
-from transcript_projection import discover_transcripts, project_transcript
+from utils.persona_vectors_utils import compute_axes
+from utils.transcript_projection import discover_transcripts, project_transcript
 
 LAYER = 21  # 65% of 32 layers — matches cached persona vectors
 MAX_SEQ_LEN = 8192  # Conservative; OLMo3 supports 4096+ natively

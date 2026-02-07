@@ -14,21 +14,22 @@ This module implements the persona vector extraction pipeline from Anthropic's r
 
 | File | Purpose |
 |------|---------|
-| `persona_vectors.py` | Main implementation (config, API calls, extraction, vector computation) |
-| `persona_vectors_utils.py` | Analysis utilities (cosine similarity matrices, PCA, plotting helpers) |
-| `plotting_utils.py` | Visualization utilities for persona vector analysis |
-| `test_persona_vectors.py` | Pytest suite validating against cached expected vectors |
+| `utils/persona_vectors.py` | Main implementation (config, API calls, extraction, vector computation) |
+| `utils/persona_vectors_utils.py` | Analysis utilities (cosine similarity matrices, PCA, plotting helpers) |
+| `utils/plotting_utils.py` | Visualization utilities for persona vector analysis |
+| `utils/transcript_projection.py` | Transcript projection onto persona axes |
+| `test/test_persona_vectors.py` | Pytest suite validating against cached expected vectors |
 | `example.py` | Usage examples for common tasks |
 | `data/test_fixtures/responses_cache.json` | Pre-computed API responses (20 personas x 18 questions) |
 | `data/test_fixtures/persona_vectors_layer40.pt` | Expected vectors for test validation |
 | `data/responses/` | Cached API responses for experiments (tracked, avoids re-calling API) |
 | `data/persona_vectors/` | Extracted persona vectors (tracked, avoids re-running GPU extraction) |
-| `experiments/` | Experiment scripts (001_olmo3_variants.py, 002_olmo_plots.py) |
+| `experiments/` | Experiment scripts (001_olmo3_variants.py, 001_olmo_plots.py, 002_transcript_projection.py) |
 
 ## Quick Start
 
 ```python
-from persona_vectors import (
+from utils.persona_vectors import (
     PersonaVectorConfig,
     ActivationExtractor,
     extract_persona_vectors,
@@ -101,7 +102,7 @@ activations = extractor.extract_activations(
 Generate responses via OpenRouter API:
 
 ```python
-from persona_vectors import generate_responses
+from utils.persona_vectors import generate_responses
 
 responses = generate_responses(
     personas={"helpful": "You are helpful", "rude": "You are rude"},
@@ -117,7 +118,7 @@ responses = generate_responses(
 ### Caching Utilities
 
 ```python
-from persona_vectors import save_responses, load_responses, save_persona_vectors, load_persona_vectors
+from utils.persona_vectors import save_responses, load_responses, save_persona_vectors, load_persona_vectors
 
 # Responses (JSON)
 save_responses(responses, Path("responses.json"))
@@ -151,7 +152,7 @@ Philosophical questions designed to elicit persona-characteristic responses:
 ## Testing
 
 ```bash
-pytest test_persona_vectors.py -v
+pytest test/ -v
 ```
 
 Primary acceptance criterion: all 20 persona vectors must have cosine similarity > 0.99 with expected vectors in `data/test_fixtures/persona_vectors_layer40.pt`.

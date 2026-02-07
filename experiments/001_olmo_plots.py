@@ -13,8 +13,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 sys.path.insert(0, str(Path("..").resolve()))
-from persona_vectors import load_persona_vectors
-from persona_vectors_utils import compute_axes
+from utils.persona_vectors import load_persona_vectors
+from utils.persona_vectors_utils import compute_axes
 
 PROJECT_DIR = Path("..").resolve()
 VECTORS_DIR = PROJECT_DIR / "data" / "persona_vectors"

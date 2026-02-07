@@ -6,13 +6,16 @@ with cosine similarity > 0.99 for all personas.
 """
 
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest
 import torch as t
 import torch.nn.functional as F
 
-from persona_vectors import (
+from utils.persona_vectors import (
     PersonaVectorConfig,
     ActivationExtractor,
     extract_persona_vectors,
@@ -24,7 +27,7 @@ from persona_vectors import (
 
 
 # Test data paths
-TEST_DATA_DIR = Path(__file__).parent / "data" / "test_fixtures"
+TEST_DATA_DIR = Path(__file__).parent.parent / "data" / "test_fixtures"
 RESPONSES_CACHE_FILE = TEST_DATA_DIR / "responses_cache.json"
 EXPECTED_VECTORS_FILE = TEST_DATA_DIR / "persona_vectors_layer40.pt"
 
@@ -245,7 +248,7 @@ class TestCrossValidation:
     """
 
     GENERATED_VECTORS_FILE = (
-        Path(__file__).parent / "data" / "persona_vectors" / "example_test_gemma-3-27b-it_layer40.pt"
+        Path(__file__).parent.parent / "data" / "persona_vectors" / "example_test_gemma-3-27b-it_layer40.pt"
     )
     CROSS_VAL_THRESHOLD = 0.90
 

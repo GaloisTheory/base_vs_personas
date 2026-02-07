@@ -6,7 +6,7 @@ Extracts hidden state activations from assistant turns and computes
 dot-product projections onto a given direction vector (e.g. assistant axis).
 
 Usage:
-    from transcript_projection import project_transcript, discover_transcripts
+    from utils.transcript_projection import project_transcript, discover_transcripts
 
     model = AutoModelForCausalLM.from_pretrained(...)
     tokenizer = AutoTokenizer.from_pretrained(...)
