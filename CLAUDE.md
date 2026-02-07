@@ -64,6 +64,7 @@ class PersonaVectorConfig:
     model_name: str = "google/gemma-3-27b-it"  # Local model for activation extraction
     openrouter_model: str = None               # Override for API (defaults to model_name)
     layer_fraction: float = 0.65               # Layer = int(num_layers * fraction + 0.5)
+    prompt_format: str = "chat"                # "chat" (chat template) or "raw" (structured plaintext)
     max_tokens: int = 256                      # Response generation
     temperature: float = 0.7                   # Response generation
     max_concurrent_requests: int = 10          # API rate limiting
