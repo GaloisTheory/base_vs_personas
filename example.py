@@ -27,7 +27,7 @@ from plotting_utils import (
 )
 
 # %%  --- Settings ---
-EXPERIMENT_NAME = "example_test"
+EXPERIMENT_NAME = "olmo3_variants"
 PROJECT_DIR = Path(__file__).parent
 RESPONSES_DIR = PROJECT_DIR / "data" / "responses"
 VECTORS_DIR = PROJECT_DIR / "data" / "persona_vectors"
@@ -40,9 +40,10 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # %%
 # Full config: 20 personas x 18 questions = 360 API calls
 config = PersonaVectorConfig()
+config.model_name = "allenai/Olmo-3-7B-Instruct"
 slug = model_slug(config.model_name)
 responses_path = RESPONSES_DIR / f"{EXPERIMENT_NAME}_{slug}.json"
-
+# %%
 # --- Responses: load cached or generate fresh + save ---
 if responses_path.exists():
     print(f"Loading cached responses from {responses_path}")
@@ -54,6 +55,7 @@ else:
     save_responses(responses, responses_path)
     print(f"Generated and saved {len(responses)} responses to {responses_path}")
 
+# %%
 # --- Vectors: create extractor, compute layer, then check cache ---
 extractor = ActivationExtractor(config)
 layer = extractor.get_extraction_layer()

@@ -39,8 +39,8 @@ class PersonaVectorConfig:
     max_concurrent_requests: int = 10
 
     # Optional tokens
-    hf_token: Optional[str] = None
-    openrouter_api_key: Optional[str] = None
+    hf_token: Optional[str] = os.getenv("HF_TOKEN")
+    openrouter_api_key: Optional[str] = os.getenv("OPENROUTER_API_KEY")
 
     def __post_init__(self):
         # Fall back to environment variables
