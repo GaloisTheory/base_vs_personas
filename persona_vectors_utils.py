@@ -68,6 +68,8 @@ def compute_axes(
 
     return {
         "names": names,
+        "assistant_axis": assistant_axis,
+        "pc1": pc1,
         "assistant_proj": assistant_proj,
         "pc1_proj": pc1_proj,
         "cosine_sim": cosine_sim,

@@ -96,6 +96,9 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 response_slug = model_slug(RESPONSE_CONFIG.model_name)
 responses_path = RESPONSES_DIR / f"{EXPERIMENT_NAME}_{response_slug}{pilot_tag}.json"
 
+responses_path.exists()
+
+# %%
 if responses_path.exists():
     print(f"Loading cached responses from {responses_path}")
     responses = load_responses(responses_path)

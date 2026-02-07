@@ -102,6 +102,42 @@ summary = pd.DataFrame([
 ])
 print(summary.to_string(index=False))
 
+# %% Cosine similarity: assistant axes vs PC1s across models
+import matplotlib.pyplot as plt
+import seaborn as sns
+import torch
+
+# Collect all 8 vectors: 4 assistant axes + 4 PC1s
+labels = []
+vecs = []
+for name, r in results.items():
+    labels.append(f"{name}\nassistant axis")
+    vecs.append(r["assistant_axis"])
+    labels.append(f"{name}\nPC1")
+    vecs.append(r["pc1"])
+
+mat = torch.stack(vecs)
+mat = mat / mat.norm(dim=1, keepdim=True)
+cos_sim = (mat @ mat.T).numpy()
+
+fig, ax = plt.subplots(figsize=(9, 8))
+sns.heatmap(
+    cos_sim,
+    xticklabels=labels,
+    yticklabels=labels,
+    annot=True,
+    fmt=".2f",
+    cmap="RdBu_r",
+    center=0,
+    vmin=-1,
+    vmax=1,
+    square=True,
+    ax=ax,
+)
+ax.set_title("Cosine Similarity: Assistant Axes & PC1s across OLMo 3 Variants")
+plt.tight_layout()
+plt.show()
+
 # %% [markdown]
 # ## Interpretation
 #
