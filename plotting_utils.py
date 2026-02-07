@@ -5,6 +5,7 @@ Provides interactive Plotly visualizations for:
 - Cosine similarity heatmaps (mean-centered)
 - PCA projections colored by assistant axis
 - Variance explained plots
+- Cross-model comparison (PCA overlay, cross-similarity)
 """
 
 from pathlib import Path
@@ -202,6 +203,216 @@ def plot_pca_variance_explained(
                   annotation_text="99%", annotation_position="right")
 
     fig.update_layout(width=800, height=500)
+
+    if save_path:
+        fig.write_html(save_path)
+
+    return fig
+
+
+def plot_pca_comparison(
+    vectors_a: dict[str, Tensor],
+    vectors_b: dict[str, Tensor],
+    label_a: str = "Model A",
+    label_b: str = "Model B",
+    save_path: Optional[Path] = None,
+) -> go.Figure:
+    """
+    Overlay two sets of persona vectors on one PCA scatter plot.
+
+    Fits PCA jointly on both sets (mean-centered together), then plots with
+    different marker shapes per model and labels per persona.
+
+    Args:
+        vectors_a: Dict mapping persona name to vector (model A)
+        vectors_b: Dict mapping persona name to vector (model B)
+        label_a: Display name for model A
+        label_b: Display name for model B
+        save_path: Optional path to save HTML file
+
+    Returns:
+        Plotly Figure object
+    """
+    # Use shared persona names (intersection)
+    shared_names = [n for n in vectors_a if n in vectors_b]
+
+    vecs_a = t.stack([vectors_a[n].float() for n in shared_names])
+    vecs_b = t.stack([vectors_b[n].float() for n in shared_names])
+    combined = t.cat([vecs_a, vecs_b], dim=0)
+
+    # Mean-center jointly
+    combined = combined - combined.mean(dim=0)
+    combined_np = combined.numpy()
+
+    pca = PCA(n_components=2)
+    coords = pca.fit_transform(combined_np)
+
+    n = len(shared_names)
+    coords_a, coords_b = coords[:n], coords[n:]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=coords_a[:, 0], y=coords_a[:, 1],
+        mode="markers+text", text=shared_names, textposition="top center",
+        name=label_a,
+        marker=dict(size=12, symbol="circle"),
+    ))
+    fig.add_trace(go.Scatter(
+        x=coords_b[:, 0], y=coords_b[:, 1],
+        mode="markers+text", text=shared_names, textposition="bottom center",
+        name=label_b,
+        marker=dict(size=12, symbol="diamond"),
+    ))
+
+    # Draw lines connecting same persona across models
+    for i in range(n):
+        fig.add_trace(go.Scatter(
+            x=[coords_a[i, 0], coords_b[i, 0]],
+            y=[coords_a[i, 1], coords_b[i, 1]],
+            mode="lines", line=dict(color="gray", width=0.5, dash="dot"),
+            showlegend=False,
+        ))
+
+    fig.update_layout(
+        title=f"Persona Space Comparison: {label_a} vs {label_b}",
+        xaxis_title=f"PC1 ({pca.explained_variance_ratio_[0]:.1%})",
+        yaxis_title=f"PC2 ({pca.explained_variance_ratio_[1]:.1%})",
+        width=1000, height=700,
+    )
+
+    if save_path:
+        fig.write_html(save_path)
+
+    return fig
+
+
+def plot_cosine_cross_similarity(
+    vectors_a: dict[str, Tensor],
+    vectors_b: dict[str, Tensor],
+    label_a: str = "Model A",
+    label_b: str = "Model B",
+    save_path: Optional[Path] = None,
+) -> go.Figure:
+    """
+    Plot heatmap of cosine similarity between model A and model B persona vectors.
+
+    Each cell (i, j) shows cosine similarity between model A's persona i
+    and model B's persona j. Vectors are mean-centered jointly before comparison.
+
+    Args:
+        vectors_a: Dict mapping persona name to vector (model A)
+        vectors_b: Dict mapping persona name to vector (model B)
+        label_a: Display name for model A
+        label_b: Display name for model B
+        save_path: Optional path to save HTML file
+
+    Returns:
+        Plotly Figure object
+    """
+    shared_names = [n for n in vectors_a if n in vectors_b]
+
+    vecs_a = t.stack([vectors_a[n].float() for n in shared_names])
+    vecs_b = t.stack([vectors_b[n].float() for n in shared_names])
+
+    # Mean-center jointly
+    combined_mean = t.cat([vecs_a, vecs_b], dim=0).mean(dim=0)
+    vecs_a = vecs_a - combined_mean
+    vecs_b = vecs_b - combined_mean
+
+    # Normalize
+    vecs_a_norm = vecs_a / vecs_a.norm(dim=1, keepdim=True)
+    vecs_b_norm = vecs_b / vecs_b.norm(dim=1, keepdim=True)
+
+    # Cross-similarity: (n_personas_a, n_personas_b)
+    cross_sim = (vecs_a_norm @ vecs_b_norm.T).numpy()
+
+    fig = px.imshow(
+        cross_sim,
+        x=[f"{n} ({label_b})" for n in shared_names],
+        y=[f"{n} ({label_a})" for n in shared_names],
+        title=f"Cross-Model Cosine Similarity: {label_a} vs {label_b}",
+        color_continuous_scale="RdBu",
+        color_continuous_midpoint=0.0,
+        aspect="equal",
+    )
+    fig.update_layout(
+        width=900,
+        height=900,
+        xaxis=dict(tickangle=45),
+    )
+
+    if save_path:
+        fig.write_html(save_path)
+
+    return fig
+
+
+MARKER_SYMBOLS = ["circle", "diamond", "square", "cross", "x", "triangle-up"]
+
+
+def plot_pca_comparison_nway(
+    all_vectors: list[dict[str, Tensor]],
+    labels: list[str],
+    save_path: Optional[Path] = None,
+) -> go.Figure:
+    """
+    Overlay N sets of persona vectors on one joint PCA scatter plot.
+
+    Fits PCA jointly on all sets (mean-centered together), plots with
+    distinct marker shapes per model and connecting lines per persona.
+
+    Args:
+        all_vectors: List of dicts mapping persona name to vector
+        labels: Display name for each model
+        save_path: Optional path to save HTML file
+
+    Returns:
+        Plotly Figure object
+    """
+    # Use shared persona names (intersection of all sets)
+    shared_names = list(all_vectors[0].keys())
+    for vecs in all_vectors[1:]:
+        shared_names = [n for n in shared_names if n in vecs]
+
+    # Stack all vectors: list of (n_personas, d_model)
+    per_model = [t.stack([v[n].float() for n in shared_names]) for v in all_vectors]
+    combined = t.cat(per_model, dim=0)
+
+    # Mean-center jointly
+    combined = combined - combined.mean(dim=0)
+    combined_np = combined.numpy()
+
+    pca = PCA(n_components=2)
+    coords = pca.fit_transform(combined_np)
+
+    n = len(shared_names)
+    coords_per_model = [coords[i * n : (i + 1) * n] for i in range(len(all_vectors))]
+
+    fig = go.Figure()
+    for idx, (label, model_coords) in enumerate(zip(labels, coords_per_model)):
+        fig.add_trace(go.Scatter(
+            x=model_coords[:, 0], y=model_coords[:, 1],
+            mode="markers+text", text=shared_names, textposition="top center",
+            name=label,
+            marker=dict(size=12, symbol=MARKER_SYMBOLS[idx % len(MARKER_SYMBOLS)]),
+        ))
+
+    # Draw lines connecting same persona across models
+    for i in range(n):
+        xs = [coords_per_model[m][i, 0] for m in range(len(all_vectors))]
+        ys = [coords_per_model[m][i, 1] for m in range(len(all_vectors))]
+        fig.add_trace(go.Scatter(
+            x=xs, y=ys,
+            mode="lines", line=dict(color="gray", width=0.5, dash="dot"),
+            showlegend=False,
+        ))
+
+    fig.update_layout(
+        title=f"Persona Space Comparison: {' / '.join(labels)}",
+        xaxis_title=f"PC1 ({pca.explained_variance_ratio_[0]:.1%})",
+        yaxis_title=f"PC2 ({pca.explained_variance_ratio_[1]:.1%})",
+        width=1100, height=750,
+    )
 
     if save_path:
         fig.write_html(save_path)

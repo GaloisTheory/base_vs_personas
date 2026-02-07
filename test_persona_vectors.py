@@ -24,7 +24,7 @@ from persona_vectors import (
 
 
 # Test data paths
-TEST_DATA_DIR = Path(__file__).parent / "for_tests"
+TEST_DATA_DIR = Path(__file__).parent / "data" / "test_fixtures"
 RESPONSES_CACHE_FILE = TEST_DATA_DIR / "responses_cache.json"
 EXPECTED_VECTORS_FILE = TEST_DATA_DIR / "persona_vectors_layer40.pt"
 

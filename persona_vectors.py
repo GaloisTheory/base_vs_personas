@@ -14,9 +14,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-# Set HF cache directory before importing transformers
-os.environ.setdefault("HF_HOME", "/workspace/.cache/huggingface")
-
 import torch as t
 from jaxtyping import Float
 from openai import AsyncOpenAI
@@ -34,6 +31,7 @@ class PersonaVectorConfig:
 
     # Extraction settings
     layer_fraction: float = 0.65  # Layer = int(num_layers * layer_fraction + 0.5)
+    prompt_format: str = "chat"  # "chat" (use chat template) or "raw" (structured plaintext)
 
     # Response generation settings
     max_tokens: int = 256
@@ -69,18 +67,28 @@ async def _generate_response_async(
     model: str,
     max_tokens: int,
     temperature: float,
+    max_retries: int = 5,
 ) -> str:
-    """Generate a single response using the async OpenRouter API."""
-    response = await client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
-        max_tokens=max_tokens,
-        temperature=temperature,
-    )
-    return response.choices[0].message.content
+    """Generate a single response using the async OpenRouter API (with retry on 429)."""
+    for attempt in range(max_retries):
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message},
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            if "429" in str(e) and attempt < max_retries - 1:
+                wait = 2 ** attempt
+                print(f"Rate limited, retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(wait)
+            else:
+                raise
 
 
 async def _generate_all_responses_async(
@@ -281,6 +289,24 @@ class ActivationExtractor:
 
         return full_prompt, response_start_idx
 
+    def _format_messages_raw(
+        self,
+        messages: list[dict[str, str]],
+    ) -> tuple[str, int]:
+        """Format messages as structured plaintext (no chat template tokens)."""
+        system = next(m["content"] for m in messages if m["role"] == "system")
+        user = next(m["content"] for m in messages if m["role"] == "user")
+        assistant = next(m["content"] for m in messages if m["role"] == "assistant")
+
+        prompt_without_response = f"System: {system}\n\nUser: {user}\n\nAssistant:"
+        full_prompt = f"{prompt_without_response} {assistant}"
+
+        response_start_idx = self.tokenizer(
+            prompt_without_response, return_tensors="pt"
+        ).input_ids.shape[1] + 1
+
+        return full_prompt, response_start_idx
+
     def extract_activations(
         self,
         system_prompts: list[str],
@@ -310,7 +336,10 @@ class ActivationExtractor:
                 {"role": "user", "content": question},
                 {"role": "assistant", "content": response},
             ]
-            full_prompt, response_start_idx = self._format_messages(messages)
+            if self.config.prompt_format == "raw":
+                full_prompt, response_start_idx = self._format_messages_raw(messages)
+            else:
+                full_prompt, response_start_idx = self._format_messages(messages)
             tokens = self.tokenizer(full_prompt, return_tensors="pt").to(self.model.device)
 
             with t.inference_mode():

@@ -1,5 +1,13 @@
-data/
+# Runtime logs
+data/*.log
+
+# Visualization outputs
 images/
+
+# Python artifacts
 __pycache__/
 .pytest_cache/
 *.pyc
+
+# Local config
+.claude/

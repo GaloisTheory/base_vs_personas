@@ -15,12 +15,15 @@ This module implements the persona vector extraction pipeline from Anthropic's r
 | File | Purpose |
 |------|---------|
 | `persona_vectors.py` | Main implementation (config, API calls, extraction, vector computation) |
+| `persona_vectors_utils.py` | Analysis utilities (cosine similarity matrices, PCA, plotting helpers) |
+| `plotting_utils.py` | Visualization utilities for persona vector analysis |
 | `test_persona_vectors.py` | Pytest suite validating against cached expected vectors |
 | `example.py` | Usage examples for common tasks |
-| `for_tests/responses_cache.json` | Pre-computed API responses (20 personas x 18 questions) |
-| `for_tests/persona_vectors_layer40.pt` | Expected vectors for test validation |
-| `for_tests/exercises.py` | Reference implementation from ARENA course |
-| `context/context.md` | Background reading on persona vectors research |
+| `data/test_fixtures/responses_cache.json` | Pre-computed API responses (20 personas x 18 questions) |
+| `data/test_fixtures/persona_vectors_layer40.pt` | Expected vectors for test validation |
+| `data/responses/` | Cached API responses for experiments (tracked, avoids re-calling API) |
+| `data/persona_vectors/` | Extracted persona vectors (tracked, avoids re-running GPU extraction) |
+| `experiments/` | Experiment scripts (001_olmo3_variants.py, 002_olmo_plots.py) |
 
 ## Quick Start
 
@@ -35,7 +38,7 @@ from persona_vectors import (
 )
 
 # Load cached responses (avoids API calls)
-responses = load_responses("for_tests/responses_cache.json")
+responses = load_responses("data/test_fixtures/responses_cache.json")
 
 # Create extractor (lazy-loads model on first use)
 config = PersonaVectorConfig()
@@ -147,12 +150,10 @@ Philosophical questions designed to elicit persona-characteristic responses:
 ## Testing
 
 ```bash
-source /workspace/miniconda3/bin/activate arena-env
-cd /workspace/001_Projects/002_mini_projects/projects/base_model_personas
 pytest test_persona_vectors.py -v
 ```
 
-Primary acceptance criterion: all 20 persona vectors must have cosine similarity > 0.99 with expected vectors in `for_tests/persona_vectors_layer40.pt`.
+Primary acceptance criterion: all 20 persona vectors must have cosine similarity > 0.99 with expected vectors in `data/test_fixtures/persona_vectors_layer40.pt`.
 
 ## Technical Details
 
