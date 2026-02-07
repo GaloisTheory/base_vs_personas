@@ -4,6 +4,9 @@ data/*.log
 # Visualization outputs
 images/
 
+# Plans for agent reviews
+plan/
+
 # Python artifacts
 __pycache__/
 .pytest_cache/
@@ -11,3 +14,4 @@ __pycache__/
 
 # Local config
 .claude/
+uv.lock

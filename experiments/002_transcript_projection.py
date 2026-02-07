@@ -92,19 +92,20 @@ for label, conv in transcripts.items():
     print(f"  {label}: {len(conv)} messages ({n_asst} assistant turns)")
 
 
-# %% Cell 4: Run All Models × All Transcripts (load each model once)
-
-SELECTED_TRANSCRIPT = "llama-70b/selfharm_unsteered"  # Used by Cells 5-7 for detailed views
+# %% Cell 4: Run All Models × All Transcripts (load/free one model at a time)
+SELECTED_TRANSCRIPT = "llama-70b/selfharm_unsteered"  # Used by later cells for detailed views
+CHAT_MODEL_NAMES = [k for k in MODELS if k in ("Instruct", "Think")]
 
 all_results: dict[str, dict[str, np.ndarray]] = {}  # all_results[model_name][label]
+all_results_chat: dict[str, dict[str, np.ndarray]] = {}  # chat-template results (Instruct/Think only)
 
 for name, (hf_id, _) in MODELS.items():
     print(f"\n{'='*60}")
     print(f"Loading: {name} ({hf_id})")
     print(f"{'='*60}")
 
-    tokenizer = AutoTokenizer.from_pretrained(hf_id, token=HF_TOKEN)
-    model = AutoModelForCausalLM.from_pretrained(
+    tok = AutoTokenizer.from_pretrained(hf_id, token=HF_TOKEN)
+    mdl = AutoModelForCausalLM.from_pretrained(
         hf_id,
         torch_dtype=torch.bfloat16,
         device_map="auto",
@@ -112,20 +113,31 @@ for name, (hf_id, _) in MODELS.items():
         token=HF_TOKEN,
     )
 
+    # Raw format: all transcripts
     all_results[name] = {}
     for label, conv in transcripts.items():
         print(f"\n  --- {label} ---")
         all_results[name][label] = project_transcript(
-            model, tokenizer, conv, all_axes[name],
+            mdl, tok, conv, all_axes[name],
             layer=LAYER, max_seq_len=MAX_SEQ_LEN,
         )
 
-    del model, tokenizer
+    # Chat template: all transcripts (Instruct/Think only)
+    if name in CHAT_MODEL_NAMES:
+        all_results_chat[name] = {}
+        for label, conv in transcripts.items():
+            print(f"\n  --- {label} [chat template] ---")
+            all_results_chat[name][label] = project_transcript(
+                mdl, tok, conv, all_axes[name],
+                format_mode="chat", layer=LAYER, max_seq_len=MAX_SEQ_LEN,
+            )
+
+    del mdl, tok
     gc.collect()
     torch.cuda.empty_cache()
     print(f"\n  GPU memory freed for {name}")
 
-# Backward-compat: results dict for the selected transcript (used by Cells 5-7)
+# Convenience: results dict for the selected transcript
 results: dict[str, np.ndarray] = {
     name: all_results[name][SELECTED_TRANSCRIPT] for name in MODELS
 }
@@ -136,8 +148,8 @@ print(f"{'='*60}")
 for name in MODELS:
     n_transcripts = len(all_results[name])
     sel = results[name]
-    print(f"  {name}: {n_transcripts} transcripts | selected ({SELECTED_TRANSCRIPT}): {len(sel)} turns, range=[{sel.min():.4f}, {sel.max():.4f}]")
-
+    chat_info = f" + {len(all_results_chat[name])} chat" if name in all_results_chat else ""
+    print(f"  {name}: {n_transcripts} transcripts{chat_info} | selected: {len(sel)} turns, range=[{sel.min():.4f}, {sel.max():.4f}]")
 
 # %% Cell 5: Plot + Raw Values (Selected Transcript)
 
@@ -194,56 +206,16 @@ for t in range(max_turns):
             print(f"  {'---':>10}", end="")
     print()
 
-# %% Cell 6: Chat Template Format — Instruct + Think (Selected Transcript)
-
-CHAT_MODELS = {k: v for k, v in MODELS.items() if k in ("Instruct", "Think")}
-conversation = transcripts[SELECTED_TRANSCRIPT]
-
-results_chat: dict[str, np.ndarray] = {}
-
-for name, (hf_id, _) in CHAT_MODELS.items():
-    print(f"\n{'='*60}")
-    print(f"Processing: {name} ({hf_id}) [chat template]")
-    print(f"{'='*60}")
-
-    print(f"  Loading tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(hf_id, token=HF_TOKEN)
-    print(f"  Loading model...")
-    model = AutoModelForCausalLM.from_pretrained(
-        hf_id,
-        torch_dtype=torch.bfloat16,
-        device_map="auto",
-        attn_implementation="eager",
-        token=HF_TOKEN,
-    )
-
-    results_chat[name] = project_transcript(
-        model, tokenizer, conversation, all_axes[name],
-        format_mode="chat", layer=LAYER, max_seq_len=MAX_SEQ_LEN,
-    )
-
-    del model, tokenizer
-    gc.collect()
-    torch.cuda.empty_cache()
-    print(f"  GPU memory freed")
-
-print(f"\n{'='*60}")
-print("Chat-format models processed!")
-print(f"{'='*60}")
-for name, projs in results_chat.items():
-    print(f"  {name}: {len(projs)} turns, range=[{projs.min():.4f}, {projs.max():.4f}]")
-
-
-# %% Cell 7: Comparison Plot — Raw vs Chat Template
+# %% Cell 6: Comparison Plot — Raw vs Chat Template
 
 fig, axes_plot = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
 
 colors_fmt = {"raw": "#888888", "chat": "#ff7f0e"}
 
-for idx, name in enumerate(CHAT_MODELS):
+for idx, name in enumerate(CHAT_MODEL_NAMES):
     ax = axes_plot[idx]
     raw_projs = results[name]
-    chat_projs = results_chat[name]
+    chat_projs = all_results_chat[name][SELECTED_TRANSCRIPT]
 
     turns_raw = np.arange(1, len(raw_projs) + 1)
     turns_chat = np.arange(1, len(chat_projs) + 1)
@@ -282,9 +254,9 @@ plt.show()
 
 # Print raw values table
 print(f"\nRaw vs Chat projection values ({axis_type} axis):")
-for name in CHAT_MODELS:
+for name in CHAT_MODEL_NAMES:
     raw_projs = results[name]
-    chat_projs = results_chat[name]
+    chat_projs = all_results_chat[name][SELECTED_TRANSCRIPT]
     print(f"\n  {name}:")
     print(f"  {'Turn':>5}  {'Raw':>10}  {'Chat':>10}  {'Diff':>10}")
     print(f"  {'-'*40}")
@@ -295,7 +267,7 @@ for name in CHAT_MODELS:
         d = c - r if not (np.isnan(r) or np.isnan(c)) else float("nan")
         print(f"  {t+1:>5}  {r:>10.4f}  {c:>10.4f}  {d:>+10.4f}")
 
-# %% Cell 8: All Transcripts — 4×4 Subplot Grid
+# %% Cell 7: All Transcripts — 4×4 Subplot Grid
 
 labels = sorted(transcripts.keys())
 n_plots = len(labels)
@@ -346,7 +318,7 @@ plt.savefig(
 plt.show()
 
 
-# %% Cell 9: Mean Projection with Error Bars (First 10 Turns)
+# %% Cell 8: Mean Projection with Error Bars (First 10 Turns)
 
 MAX_TURNS_MEAN = 10
 
@@ -400,6 +372,59 @@ ax.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
 plt.tight_layout()
 plt.savefig(
     PROJECT_DIR / "images" / "transcript_projection_mean_first10.png",
+    dpi=150, bbox_inches="tight",
+)
+plt.show()
+
+
+# %% Cell 9: Mean Raw vs Chat Template (First 10 Turns, All Transcripts)
+
+fig, axes_plot = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
+
+colors_fmt = {"Raw": "#888888", "Chat": "#ff7f0e"}
+markers_fmt = {"Raw": "o", "Chat": "s"}
+
+for idx, name in enumerate(CHAT_MODEL_NAMES):
+    ax = axes_plot[idx]
+
+    for fmt_label, results_dict in [("Raw", all_results), ("Chat", all_results_chat)]:
+        padded = np.full((len(transcripts), MAX_TURNS_MEAN), np.nan)
+        for i, label in enumerate(sorted(transcripts.keys())):
+            projs = results_dict[name][label]
+            n = min(len(projs), MAX_TURNS_MEAN)
+            padded[i, :n] = projs[:n]
+
+        means = np.nanmean(padded, axis=0)
+        counts = np.sum(~np.isnan(padded), axis=0)
+        stds = np.nanstd(padded, axis=0, ddof=1)
+        sems = stds / np.sqrt(counts)
+
+        turns = np.arange(1, MAX_TURNS_MEAN + 1)
+        ax.errorbar(
+            turns, means, yerr=sems,
+            color=colors_fmt[fmt_label], marker=markers_fmt[fmt_label],
+            label=fmt_label, linewidth=2, markersize=6,
+            capsize=3, linestyle="--" if fmt_label == "Raw" else "-",
+        )
+
+    ax.set_xlabel("Assistant Turn", fontsize=12)
+    if idx == 0:
+        ax.set_ylabel("Mean Projection onto Assistant Axis", fontsize=12)
+    ax.set_title(f"{name}", fontsize=13)
+    ax.set_xticks(range(1, MAX_TURNS_MEAN + 1))
+    ax.legend(fontsize=10)
+    ax.grid(True, alpha=0.3)
+    ax.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
+
+axis_type = "Shared (Instruct)" if SHARED_AXIS else "Model-Specific"
+fig.suptitle(
+    f"Mean Raw vs Chat Template ± SEM (First {MAX_TURNS_MEAN} Turns, N={len(transcripts)} transcripts)\n"
+    f"(Layer {LAYER}, {axis_type} Axis)",
+    fontsize=14,
+)
+plt.tight_layout()
+plt.savefig(
+    PROJECT_DIR / "images" / "transcript_projection_mean_raw_vs_chat.png",
     dpi=150, bbox_inches="tight",
 )
 plt.show()

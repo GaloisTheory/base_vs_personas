@@ -8,6 +8,9 @@
 import sys
 from pathlib import Path
 
+import matplotlib.pyplot as plt 
+import seaborn as sns
+import torch 
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -103,10 +106,6 @@ summary = pd.DataFrame([
 print(summary.to_string(index=False))
 
 # %% Cosine similarity: assistant axes vs PC1s across models
-import matplotlib.pyplot as plt
-import seaborn as sns
-import torch
-
 # Collect all 8 vectors: 4 assistant axes + 4 PC1s
 labels = []
 vecs = []

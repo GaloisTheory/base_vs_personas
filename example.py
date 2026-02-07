@@ -82,3 +82,5 @@ plot_cosine_similarity_heatmap(vectors, save_path=OUTPUT_DIR / f"cosine_similari
 plot_pca_projection(vectors, save_path=OUTPUT_DIR / f"pca_projection_{EXPERIMENT_NAME}.html").show()
 plot_pca_variance_explained(vectors, save_path=OUTPUT_DIR / f"pca_variance_{EXPERIMENT_NAME}.html").show()
 print(f"Plots saved to {OUTPUT_DIR}")
+
+# %%

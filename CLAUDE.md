@@ -157,6 +157,50 @@ pytest test/ -v
 
 Primary acceptance criterion: all 20 persona vectors must have cosine similarity > 0.99 with expected vectors in `data/test_fixtures/persona_vectors_layer40.pt`.
 
+## Experiment 002: Transcript Projection onto Assistant Axis
+
+Projects multi-turn conversation hidden states onto the assistant axis to measure "assistant personality" persistence across models and turns.
+
+### Setup
+
+- **Models**: 4 OLMo 3 7B variants — Base, Instruct, Think, RL-Zero
+- **Layer**: 21 (65% of 32 layers, matches cached persona vectors)
+- **Axis**: Shared Instruct axis (5 assistant vs 18 role personas)
+- **Transcripts**: Multiple conversations discovered from `context/assistant-axis/transcripts/`
+
+### Code Structure (`experiments/002_transcript_projection.py`)
+
+| Cell | Purpose |
+|------|---------|
+| 1 | Imports, config, model/path definitions |
+| 2 | Load cached persona vectors (CPU), compute axes, pairwise cosine similarities |
+| 3 | Discover and load all transcript JSONs |
+| 4 | Model loop — load each model, run all transcripts (raw + chat template for Instruct/Think), free GPU |
+| 5 | Plot selected transcript (all 4 models overlaid) + raw values table |
+| 6 | Raw vs chat template comparison plot (Instruct + Think only) |
+| 7 | All transcripts 4xN subplot grid |
+| 8 | Mean projection with SEM error bars (first 10 turns, all transcripts) |
+| 9 | Mean raw vs chat template with SEM (first 10 turns, all transcripts) |
+
+### Key Data Structures
+
+- `all_results[model_name][transcript_label] -> np.ndarray` — raw format projections
+- `all_results_chat[model_name][transcript_label] -> np.ndarray` — chat template projections (Instruct/Think only)
+- `results[model_name] -> np.ndarray` — convenience alias for `SELECTED_TRANSCRIPT`
+
+### Key Findings
+
+1. **Base projects higher than Instruct** on the assistant axis — counterintuitive; axis may capture surface-level role-playing patterns rather than deep "assistant-ness"
+2. **Chat template doesn't boost projection** — raw and chat format produce similar trajectories
+3. **Selfharm transcript: universal drift toward zero** — all models lose "assistant-ness" in harmful conversations
+4. **Base ≈ RL-Zero** — axes nearly identical (cosine 0.9965), projections track closely
+
+### Reusable Module: `utils/transcript_projection.py`
+
+- `discover_transcripts(base_dir)` — recursively finds transcript JSONs, returns `{label: conversation}`
+- `find_assistant_spans(tokenizer, conversation, format_mode)` — token spans for assistant response content
+- `project_transcript(model, tokenizer, conversation, axis, ...)` — single forward pass, mean-pool each assistant span, dot with axis
+
 ## Technical Details
 
 - **Model**: google/gemma-3-27b-it (62 layers, hidden size 5376)
