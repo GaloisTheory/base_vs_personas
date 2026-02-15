@@ -43,7 +43,7 @@ SHARED_AXIS = True
 # Paths
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 VECTORS_DIR = PROJECT_DIR / "data" / "persona_vectors"
-TRANSCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "context" / "assistant-axis" / "transcripts"
+TRANSCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "assistant-axis" / "transcripts"
 
 HF_TOKEN = None  # Set if needed for gated models; OLMo3 is open
 
@@ -429,4 +429,49 @@ plt.savefig(
 )
 plt.show()
 
+# %% Cell 10: Instruct-only forward pass on selected transcript
+
+INSTRUCT_TRANSCRIPT = "llama-70b/selfharm_unsteered"
+
+hf_id = MODELS["Instruct"][0]
+print(f"Loading Instruct model: {hf_id}")
+tok = AutoTokenizer.from_pretrained(hf_id, token=HF_TOKEN)
+mdl = AutoModelForCausalLM.from_pretrained(
+    hf_id,
+    torch_dtype=torch.bfloat16,
+    device_map="auto",
+    attn_implementation="eager",
+    token=HF_TOKEN,
+)
+
+conv = transcripts[INSTRUCT_TRANSCRIPT]
+axis = all_axes["Instruct"]
+
+print(f"\n--- Raw format ---")
+instruct_raw = project_transcript(
+    mdl, tok, conv, axis, layer=LAYER, max_seq_len=MAX_SEQ_LEN,
+)
+
+print(f"\n--- Chat template ---")
+instruct_chat = project_transcript(
+    mdl, tok, conv, axis, format_mode="chat", layer=LAYER, max_seq_len=MAX_SEQ_LEN,
+)
+
+del mdl, tok
+gc.collect()
+torch.cuda.empty_cache()
+print("\nGPU memory freed")
+
+# Print results
+print(f"\nInstruct projections on '{INSTRUCT_TRANSCRIPT}':")
+print(f"{'Turn':>5}  {'Raw':>10}  {'Chat':>10}  {'Diff':>10}")
+print(f"{'-'*40}")
+for t in range(max(len(instruct_raw), len(instruct_chat))):
+    r = instruct_raw[t] if t < len(instruct_raw) else float("nan")
+    c = instruct_chat[t] if t < len(instruct_chat) else float("nan")
+    d = c - r if not (np.isnan(r) or np.isnan(c)) else float("nan")
+    print(f"{t+1:>5}  {r:>10.4f}  {c:>10.4f}  {d:>+10.4f}")
+
+# %%
+conv 
 # %%
