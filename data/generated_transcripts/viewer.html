@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transcript Viewer — 003b</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --text: #e0e0e0;
+    --text-muted: #8892a4;
+    --user-bg: #1b2838;
+    --asst-bg: #0f3460;
+    --accent: #e94560;
+    --accent2: #53a8b6;
+    --border: #2a2a4a;
+    --proj-pos: #4ecca3;
+    --proj-neg: #e94560;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  header h1 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .controls label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .controls select, .controls input[type="range"] {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.85rem;
+  }
+
+  .controls select { cursor: pointer; }
+
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    margin-top: 12px;
+  }
+
+  .tab-bar button {
+    background: var(--surface2);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    padding: 6px 16px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .tab-bar button.active {
+    background: var(--bg);
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .tab-bar button:hover:not(.active) {
+    background: #1a2d50;
+    color: var(--text);
+  }
+
+  .main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .meta {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    font-size: 0.82rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 6px 20px;
+  }
+
+  .meta span { color: var(--text-muted); }
+  .meta strong { color: var(--text); }
+
+  .system-prompt {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+
+  .system-prompt .label {
+    font-weight: 600;
+    color: var(--accent2);
+    margin-bottom: 4px;
+  }
+
+  .turn {
+    margin-bottom: 16px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .turn-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 14px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .turn-number {
+    font-weight: 700;
+    color: var(--accent2);
+    font-size: 0.85rem;
+  }
+
+  .projection-badge {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.78rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+
+  .proj-positive { background: rgba(78, 204, 163, 0.15); color: var(--proj-pos); }
+  .proj-negative { background: rgba(233, 69, 96, 0.15); color: var(--proj-neg); }
+
+  .message {
+    padding: 12px 16px;
+    font-size: 0.88rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  .message.user {
+    background: var(--user-bg);
+    border-left: 3px solid var(--accent);
+  }
+
+  .message.assistant {
+    background: var(--asst-bg);
+    border-left: 3px solid var(--accent2);
+  }
+
+  .role-tag {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .role-tag.user { color: var(--accent); }
+  .role-tag.assistant { color: var(--accent2); }
+
+  .projection-chart {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+
+  .projection-chart h3 {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+
+  .chart-container {
+    position: relative;
+    height: 120px;
+  }
+
+  .chart-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 100%;
+  }
+
+  .chart-bar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    position: relative;
+  }
+
+  .chart-bar .bar {
+    width: 70%;
+    border-radius: 3px 3px 0 0;
+    min-height: 2px;
+    transition: height 0.3s;
+  }
+
+  .chart-bar .bar-label {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .no-data {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 40px;
+    font-size: 0.9rem;
+  }
+
+  .sample-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sample-nav button {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 10px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+
+  .sample-nav button:hover { background: #1a2d50; }
+  .sample-nav button:disabled { opacity: 0.3; cursor: default; }
+
+  .sample-nav span {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    min-width: 80px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Transcript Viewer — 003b Conditions</h1>
+  <div class="tab-bar" id="tabBar"></div>
+  <div class="controls">
+    <div class="sample-nav">
+      <button id="prevBtn" onclick="changeSample(-1)">&larr;</button>
+      <span id="sampleLabel">Sample 1 / 16</span>
+      <button id="nextBtn" onclick="changeSample(1)">&rarr;</button>
+    </div>
+  </div>
+</header>
+
+<div class="main" id="content">
+  <div class="no-data">Loading...</div>
+</div>
+
+<script>
+const FILES = [
+  { path: 'original_selfharm_unsteered.json', label: 'Original Unsteered', format: 'original' },
+  { path: 'original_selfharm_capped.json', label: 'Original Capped', format: 'original' },
+  { path: '003b_baseline.json', label: 'Baseline', format: 'generated' },
+  { path: '003b_simple_sysprompt.json', label: 'Simple System Prompt', format: 'generated' },
+  { path: '003b_complex_sysprompt.json', label: 'Complex System Prompt', format: 'generated' },
+];
+
+let datasets = {};
+let activeTab = null;
+let sampleIdx = 0;
+
+async function loadAll() {
+  for (const f of FILES) {
+    try {
+      const resp = await fetch(f.path);
+      const raw = await resp.json();
+      datasets[f.label] = { raw, format: f.format };
+    } catch (e) {
+      console.error(`Failed to load ${f.path}:`, e);
+    }
+  }
+  buildTabs();
+  switchTab(FILES[0].label);
+}
+
+function buildTabs() {
+  const bar = document.getElementById('tabBar');
+  bar.innerHTML = '';
+  for (const f of FILES) {
+    if (!datasets[f.label]) continue;
+    const btn = document.createElement('button');
+    btn.textContent = f.label;
+    btn.onclick = () => switchTab(f.label);
+    btn.id = 'tab-' + f.label;
+    bar.appendChild(btn);
+  }
+}
+
+function switchTab(label) {
+  activeTab = label;
+  sampleIdx = 0;
+  document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+  const tabBtn = document.getElementById('tab-' + label);
+  if (tabBtn) tabBtn.classList.add('active');
+  render();
+}
+
+function changeSample(delta) {
+  const entry = datasets[activeTab];
+  if (!entry || entry.format === 'original') return;
+  const data = entry.raw;
+  sampleIdx = Math.max(0, Math.min(data.n_samples - 1, sampleIdx + delta));
+  render();
+}
+
+function parseTurns(conv) {
+  const turns = [];
+  let i = 0;
+  while (i < conv.length) {
+    let userMsg = null, asstMsg = null;
+    while (i < conv.length && conv[i].role !== 'user') i++;
+    if (i < conv.length) { userMsg = conv[i]; i++; }
+    while (i < conv.length && conv[i].role === 'system') i++;
+    if (i < conv.length && conv[i].role === 'assistant') { asstMsg = conv[i]; i++; }
+    if (userMsg && asstMsg) turns.push({ user: userMsg, assistant: asstMsg });
+  }
+  return turns;
+}
+
+function render() {
+  const entry = datasets[activeTab];
+  const el = document.getElementById('content');
+  if (!entry) { el.innerHTML = '<div class="no-data">No data loaded</div>'; return; }
+
+  const data = entry.raw;
+  const isOriginal = entry.format === 'original';
+
+  // Get conversation and projections based on format
+  let conv, proj, nSamples;
+  if (isOriginal) {
+    conv = data.conversation;
+    proj = null;
+    nSamples = 1;
+  } else {
+    conv = data.conversations[sampleIdx];
+    proj = data.projections[sampleIdx];
+    nSamples = data.n_samples;
+  }
+
+  // Update sample nav visibility
+  const navEl = document.querySelector('.sample-nav');
+  if (isOriginal) {
+    navEl.style.display = 'none';
+  } else {
+    navEl.style.display = 'flex';
+    document.getElementById('sampleLabel').textContent = `Sample ${sampleIdx + 1} / ${nSamples}`;
+    document.getElementById('prevBtn').disabled = sampleIdx === 0;
+    document.getElementById('nextBtn').disabled = sampleIdx === nSamples - 1;
+  }
+
+  let html = '';
+
+  // Metadata
+  if (isOriginal) {
+    html += `<div class="meta">
+      <div><span>Model:</span> <strong>${esc(data.model)}</strong></div>
+      <div><span>Turns:</span> <strong>${data.turns}</strong></div>
+      <div><span>Type:</span> <strong>Original source transcript</strong></div>
+      ${data.steering_config ? `<div><span>Steering:</span> <strong>${esc(data.steering_config.experiment_id)}</strong></div>` : ''}
+    </div>`;
+  } else {
+    html += `<div class="meta">
+      <div><span>Model:</span> <strong>${esc(data.model)}</strong></div>
+      <div><span>Source:</span> <strong>${esc(data.transcript_source)}</strong></div>
+      <div><span>Condition:</span> <strong>${esc(data.condition)}</strong></div>
+      <div><span>Temp:</span> <strong>${data.temperature}</strong></div>
+    </div>`;
+  }
+
+  // System prompt
+  if (data.system_prompt) {
+    html += `<div class="system-prompt">
+      <div class="label">System Prompt</div>
+      ${esc(data.system_prompt)}
+    </div>`;
+  }
+
+  // Projection chart (only for generated)
+  if (proj) {
+    html += renderChart(proj);
+  }
+
+  // Parse and render turns
+  const turns = parseTurns(conv);
+
+  for (let t = 0; t < turns.length; t++) {
+    let projBadge = '';
+    if (proj && t < proj.length) {
+      const projVal = proj[t];
+      const projClass = projVal >= 0 ? 'proj-positive' : 'proj-negative';
+      projBadge = `<span class="projection-badge ${projClass}" title="Assistant-axis projection">proj: ${projVal.toFixed(3)}</span>`;
+    }
+
+    html += `<div class="turn">
+      <div class="turn-header">
+        <span class="turn-number">Turn ${t + 1}</span>
+        ${projBadge}
+      </div>
+      <div class="message user">
+        <span class="role-tag user">User</span>${esc(turns[t].user.content)}</div>
+      <div class="message assistant">
+        <span class="role-tag assistant">Assistant</span>${esc(turns[t].assistant.content)}</div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+function renderChart(proj) {
+  const maxAbs = Math.max(...proj.map(Math.abs), 0.1);
+
+  let bars = '';
+  for (let i = 0; i < proj.length; i++) {
+    const v = proj[i];
+    const heightPct = (Math.abs(v) / maxAbs) * 90;
+    const color = v >= 0 ? 'var(--proj-pos)' : 'var(--proj-neg)';
+    bars += `<div class="chart-bar">
+      <div class="bar" style="height:${heightPct}%;background:${color};" title="Turn ${i+1}: ${v.toFixed(3)}"></div>
+      <div class="bar-label">${i+1}</div>
+    </div>`;
+  }
+
+  return `<div class="projection-chart">
+    <h3>Assistant-Axis Projection by Turn</h3>
+    <div class="chart-container">
+      <div class="chart-bar-row">${bars}</div>
+    </div>
+  </div>`;
+}
+
+function esc(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft') changeSample(-1);
+  if (e.key === 'ArrowRight') changeSample(1);
+});
+
+loadAll();
+</script>
+</body>
+</html>
